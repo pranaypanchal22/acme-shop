@@ -1,0 +1,28 @@
+name: Security
+on:
+  schedule: [ { cron: "0 6 * * *" } ]
+  workflow_dispatch:
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+        with: { config: "p/ci" }
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: |
+          docker build -t catalog-api:scan ./services/catalog-api
+          docker build -t orders-api:scan ./services/orders-api
+          docker build -t frontend:scan ./services/frontend
+      - name: Scan images
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: "catalog-api:scan,orders-api:scan,frontend:scan"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"

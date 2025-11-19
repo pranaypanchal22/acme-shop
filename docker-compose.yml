@@ -1,0 +1,61 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  catalog-api:
+    build: ./services/catalog-api
+    # Wait for Mongo to be ready, then start dev
+    command: ["sh","-lc","until nc -z mongo 27017; do echo 'waiting for mongo...'; sleep 1; done; npm run dev"]
+    environment:
+      MONGO_URI: "mongodb://mongo:27017/acme"
+      PORT: "4001"
+      NODE_ENV: "development"
+    ports:
+      - "4001:4001"
+    depends_on:
+      - mongo
+    # 👇 ensures node_modules inside container stay visible
+    volumes:
+      - ./services/catalog-api:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  orders-api:
+    build: ./services/orders-api
+    command: ["uvicorn","app.main:app","--host","0.0.0.0","--port","4002","--reload"]
+    environment:
+      PORT: "4002"
+    ports:
+      - "4002:4002"
+    volumes:
+      - ./services/orders-api:/app"
+    restart: unless-stopped
+
+  frontend:
+    build: ./services/frontend
+    command: ["npm","run","dev","--","--host","0.0.0.0"]
+    environment:
+      VITE_CATALOG_URL: "http://localhost:4001"
+      VITE_ORDERS_URL:  "http://localhost:4002"
+      NODE_ENV: "development"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - catalog-api
+      - orders-api
+    volumes:
+      - ./services/frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+
+
+
